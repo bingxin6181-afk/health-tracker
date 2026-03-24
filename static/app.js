@@ -1,61 +1,185 @@
-// 安全获取元素（不存在返回null，不报错）
+// ============================================
+// 配置常量
+// ============================================
+const CONFIG = {
+    DEFAULT_SLEEPINESS_LEVEL: 3,
+    DEFAULT_INTENSITY: 3,
+    DEFAULT_SMOOTHNESS: 3,
+    MAX_NOTE_LENGTH: 500,
+    MAX_TEXT_LENGTH: 200,
+    REQUEST_TIMEOUT: 10000
+};
+
+// ============================================
+// 状态管理（替代全局变量）
+// ============================================
+const AppState = {
+    currentPoopStar: CONFIG.DEFAULT_SMOOTHNESS,
+    currentSleepQuality: 3,
+    
+    setPoopStar(n) {
+        this.currentPoopStar = n;
+        updatePoopStarUI(n);
+    },
+    
+    setSleepQuality(n) {
+        this.currentSleepQuality = n;
+        updateSleepQualityUI(n);
+    }
+};
+
+// ============================================
+// 工具函数
+// ============================================
+
+/**
+ * 安全获取元素
+ */
 function get(id) {
     return document.getElementById(id);
 }
 
-// 安全设置textContent
+/**
+ * XSS 防护：转义 HTML 特殊字符
+ */
+function escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+/**
+ * 安全设置 textContent
+ */
 function setText(id, text) {
     const el = get(id);
     if (el) el.textContent = text;
 }
 
-// 安全设置value
+/**
+ * 安全设置 value
+ */
 function setValue(id, val) {
     const el = get(id);
     if (el) el.value = val;
 }
 
-// 全局变量
-let currentPoopStar = 3;
-let currentSleepQuality = 3;
-
-// 初始化
-document.addEventListener('DOMContentLoaded', () => {
-    // 设置日期
-    const dateEl = get('current-date');
-    if (dateEl) dateEl.textContent = new Date().toLocaleDateString('zh-CN');
-    
-    // 设置默认时间（如果元素存在）
-    const now = new Date().toTimeString().slice(0, 5);
-    setValue('actual-wake-time', now);
-    setValue('actual-bed-time', now);
-    setValue('meal-time', now);
-    setValue('meal-actual-time', now);
-    
-    // 加载数据
-    loadTodayData();
-    
-    // 初始化图表（如果页面有）
-    if (get('trendChart')) {
-        loadWeeklyStats();
-    }
-});
-
-// 加载今日数据
-async function loadTodayData() {
-    try {
-        const res = await fetch('/api/today');
-        const data = await res.json();
-        updateDashboard(data);
-        renderLogs(data);
-        updateSleepDisplay(data);
-    } catch (e) {
-        console.error('加载失败:', e);
-    }
+/**
+ * 截断文本
+ */
+function truncate(str, maxLength) {
+    if (!str) return '';
+    str = String(str);
+    return str.length > maxLength ? str.substring(0, maxLength) : str;
 }
 
+// ============================================
+// API 层 - 统一处理请求
+// ============================================
+const API = {
+    async request(url, options = {}) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+        
+        try {
+            const res = await fetch(url, {
+                ...options,
+                signal: controller.signal,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+            clearTimeout(timeoutId);
+            
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP ${res.status}`);
+            }
+            
+            return await res.json();
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('请求超时，请检查网络');
+            }
+            throw error;
+        }
+    },
+    
+    async get(url) {
+        return this.request(url, { method: 'GET' });
+    },
+    
+    async post(url, data = {}) {
+        return this.request(url, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+    
+    // 具体 API 方法
+    async getToday() {
+        return this.get('/api/today');
+    },
+    
+    async addWater() {
+        return this.post('/api/water');
+    },
+    
+    async undoWater() {
+        return this.post('/api/water/undo');
+    },
+    
+    async addPee() {
+        return this.post('/api/pee');
+    },
+    
+    async addPoop(data) {
+        return this.post('/api/poop', data);
+    },
+    
+    async undoPoop() {
+        return this.post('/api/poop/undo');
+    },
+    
+    async updateMeal(data) {
+        return this.post('/api/meal', data);
+    },
+    
+    async recordWake(data) {
+        return this.post('/api/sleep/wake', data);
+    },
+    
+    async recordBed(data) {
+        return this.post('/api/sleep/bed', data);
+    },
+    
+    async recordSleepQuality(data) {
+        return this.post('/api/sleep/quality', data);
+    },
+    
+    async addSport(data) {
+        return this.post('/api/sport', data);
+    },
+    
+    async addVoice(data) {
+        return this.post('/api/voice', data);
+    },
+    
+    async addCustom(data) {
+        return this.post('/api/custom', data);
+    }
+};
+
+// ============================================
+// UI 渲染函数（使用 textContent 防止 XSS）
+// ============================================
+
+/**
+ * 更新仪表盘
+ */
 function updateDashboard(data) {
-    // 更新计数（安全方式）
     const waterCount = data.water_logs ? data.water_logs.length : 0;
     const peeCount = data.pee_logs ? data.pee_logs.length : 0;
     const poopCount = data.poop_logs ? data.poop_logs.length : 0;
@@ -81,96 +205,161 @@ function updateDashboard(data) {
     setText('sport-count', sportMinutes);
 }
 
+/**
+ * 更新睡眠显示（安全渲染）
+ */
 function updateSleepDisplay(data) {
     const container = get('sleep-records');
     if (!container) return;
     
-    let html = '';
+    // 使用 DocumentFragment 安全构建 DOM
+    const fragment = document.createDocumentFragment();
+    
     if (data.wake_up_actual) {
+        const div = document.createElement('div');
         const lateText = data.is_late ? ` (晚了${data.late_minutes}分钟)` : '';
-        html += `<div>⏰ 起床: ${data.wake_up_actual}${lateText}</div>`;
+        div.textContent = `⏰ 起床: ${data.wake_up_actual}${lateText}`;
+        fragment.appendChild(div);
     }
+    
     if (data.bed_time_actual) {
+        const div = document.createElement('div');
         const sleepyText = data.sleepiness_level ? ` (困意${data.sleepiness_level}/5)` : '';
-        html += `<div>🌙 入睡: ${data.bed_time_actual}${sleepyText}</div>`;
+        div.textContent = `🌙 入睡: ${data.bed_time_actual}${sleepyText}`;
+        fragment.appendChild(div);
     }
+    
     if (data.sleep_quality) {
-        html += `<div>📊 昨晚质量: ${'⭐'.repeat(data.sleep_quality)}</div>`;
+        const div = document.createElement('div');
+        div.textContent = `📊 昨晚质量: ${'⭐'.repeat(data.sleep_quality)}`;
+        fragment.appendChild(div);
     }
-    container.innerHTML = html || '<div class="text-gray-400">今日尚未记录睡眠</div>';
+    
+    if (!fragment.hasChildNodes()) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-gray-400';
+        emptyDiv.textContent = '今日尚未记录睡眠';
+        fragment.appendChild(emptyDiv);
+    }
+    
+    container.innerHTML = '';
+    container.appendChild(fragment);
 }
 
+/**
+ * 渲染日志列表（安全渲染）
+ */
 function renderLogs(data) {
     const container = get('today-logs');
     if (!container) return;
     
-    let html = '';
+    const fragment = document.createDocumentFragment();
     
+    // 喝水记录
     if (data.water_logs && data.water_logs.length > 0) {
-        html += `<div class="bg-blue-50 p-3 rounded-xl flex justify-between items-center">
-            <span>💧 喝水 x${data.water_logs.length}</span>
-            <span class="text-gray-500 text-sm">最新: ${data.water_logs[data.water_logs.length-1]}</span>
-        </div>`;
+        const div = document.createElement('div');
+        div.className = 'bg-blue-50 p-3 rounded-xl flex justify-between items-center';
+        div.innerHTML = `
+            <span>💧 喝水 x${escapeHtml(data.water_logs.length)}</span>
+            <span class="text-gray-500 text-sm">最新: ${escapeHtml(data.water_logs[data.water_logs.length-1])}</span>
+        `;
+        fragment.appendChild(div);
     }
     
+    // 排尿记录
     if (data.pee_logs && data.pee_logs.length > 0) {
-        html += `<div class="bg-cyan-50 p-3 rounded-xl flex justify-between items-center">
-            <span>🚽 排尿 x${data.pee_logs.length}</span>
-        </div>`;
+        const div = document.createElement('div');
+        div.className = 'bg-cyan-50 p-3 rounded-xl flex justify-between items-center';
+        div.innerHTML = `<span>🚽 排尿 x${escapeHtml(data.pee_logs.length)}</span>`;
+        fragment.appendChild(div);
     }
     
+    // 排便记录
     if (data.poop_logs && data.poop_logs.length > 0) {
         const last = data.poop_logs[data.poop_logs.length-1];
-        html += `<div class="bg-amber-50 p-3 rounded-xl flex justify-between items-center">
-            <span>💩 排便 ${'⭐'.repeat(last.smoothness)}</span>
-            <span class="text-gray-500 text-sm">${last.time}</span>
-        </div>`;
+        const div = document.createElement('div');
+        div.className = 'bg-amber-50 p-3 rounded-xl flex justify-between items-center';
+        div.innerHTML = `
+            <span>💩 排便 ${'⭐'.repeat(last.smoothness || 3)}</span>
+            <span class="text-gray-500 text-sm">${escapeHtml(last.time)}</span>
+        `;
+        fragment.appendChild(div);
     }
     
+    // 三餐记录
     if (data.meals) {
+        const icons = {breakfast: '🍳', lunch: '🍱', dinner: '🍽️'};
+        const names = {breakfast: '早餐', lunch: '午餐', dinner: '晚餐'};
+        
         ['breakfast', 'lunch', 'dinner'].forEach(type => {
             const meal = data.meals[type];
             if (meal && meal.time) {
-                const icons = {breakfast: '🍳', lunch: '🍱', dinner: '🍽️'};
-                html += `<div class="bg-orange-50 p-3 rounded-xl flex justify-between items-center">
+                const div = document.createElement('div');
+                div.className = 'bg-orange-50 p-3 rounded-xl flex justify-between items-center';
+                div.innerHTML = `
                     <div>
-                        <span>${icons[type]} ${meal.food || '未备注'}</span>
-                        <div class="text-xs text-gray-500">${meal.duration}分钟</div>
+                        <span>${icons[type]} ${escapeHtml(meal.food || '未备注')}</span>
+                        <div class="text-xs text-gray-500">${escapeHtml(meal.duration || 0)}分钟</div>
                     </div>
-                    <span class="text-gray-500 text-sm">${meal.time}</span>
-                </div>`;
+                    <span class="text-gray-500 text-sm">${escapeHtml(meal.time)}</span>
+                `;
+                fragment.appendChild(div);
             }
         });
     }
     
-    container.innerHTML = html || '<div class="text-gray-400 text-center py-4">今日暂无记录</div>';
+    if (!fragment.hasChildNodes()) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-gray-400 text-center py-4';
+        emptyDiv.textContent = '今日暂无记录';
+        fragment.appendChild(emptyDiv);
+    }
+    
+    container.innerHTML = '';
+    container.appendChild(fragment);
 }
 
-// Tab切换
-function switchTab(tab) {
-    const todayPage = get('page-today');
-    const dataPage = get('page-data');
-    const todayTab = get('tab-today');
-    const dataTab = get('tab-data');
+// ============================================
+// 初始化
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // 设置日期
+    const dateEl = get('current-date');
+    if (dateEl) dateEl.textContent = new Date().toLocaleDateString('zh-CN');
     
-    if (!todayPage || !dataPage) return; // 安全退出
+    // 设置默认时间
+    const now = new Date().toTimeString().slice(0, 5);
+    setValue('actual-wake-time', now);
+    setValue('actual-bed-time', now);
     
-    if (tab === 'today') {
-        todayPage.classList.remove('hidden');
-        dataPage.classList.add('hidden');
-        if (todayTab) todayTab.className = 'flex-1 py-3 text-center tab-active';
-        if (dataTab) dataTab.className = 'flex-1 py-3 text-center tab-inactive';
-        loadTodayData();
-    } else {
-        todayPage.classList.add('hidden');
-        dataPage.classList.remove('hidden');
-        if (todayTab) todayTab.className = 'flex-1 py-3 text-center tab-inactive';
-        if (dataTab) dataTab.className = 'flex-1 py-3 text-center tab-active';
-        loadDataDashboard();
+    // 加载数据
+    loadTodayData();
+    
+    // 初始化图表
+    if (get('trendChart')) {
+        loadWeeklyStats();
+    }
+});
+
+/**
+ * 加载今日数据
+ */
+async function loadTodayData() {
+    try {
+        const data = await API.getToday();
+        updateDashboard(data);
+        renderLogs(data);
+        updateSleepDisplay(data);
+    } catch (error) {
+        console.error('加载失败:', error);
+        showToast('加载数据失败: ' + error.message);
     }
 }
 
-// 模态框通用函数
+// ============================================
+// 通用 UI 函数
+// ============================================
+
 function openModal(id) {
     const el = get(id);
     if (el) el.classList.remove('hidden');
@@ -189,49 +378,85 @@ function showToast(msg) {
     setTimeout(() => div.remove(), 2000);
 }
 
-// ==================== 具体功能 ====================
+// Tab 切换
+function switchTab(tab) {
+    const todayPage = get('page-today');
+    const dataPage = get('page-data');
+    const todayTab = get('tab-today');
+    const dataTab = get('tab-data');
+    const todayIndicator = todayTab?.querySelector('.tab-indicator');
+    const dataIndicator = dataTab?.querySelector('.tab-indicator');
+    
+    if (!todayPage || !dataPage) return;
+    
+    if (tab === 'today') {
+        todayPage.classList.remove('hidden');
+        dataPage.classList.add('hidden');
+        if (todayTab) {
+            todayTab.className = 'flex-1 py-4 text-center relative font-medium text-blue-600';
+        }
+        if (dataTab) {
+            dataTab.className = 'flex-1 py-4 text-center relative font-medium text-gray-500';
+        }
+        if (todayIndicator) todayIndicator.style.display = 'block';
+        if (dataIndicator) dataIndicator.style.display = 'none';
+        loadTodayData();
+    } else {
+        todayPage.classList.add('hidden');
+        dataPage.classList.remove('hidden');
+        if (todayTab) {
+            todayTab.className = 'flex-1 py-4 text-center relative font-medium text-gray-500';
+        }
+        if (dataTab) {
+            dataTab.className = 'flex-1 py-4 text-center relative font-medium text-blue-600';
+        }
+        if (todayIndicator) todayIndicator.style.display = 'none';
+        if (dataIndicator) dataIndicator.style.display = 'block';
+    }
+}
+
+// ============================================
+// 具体功能函数
+// ============================================
 
 // 喝水
 async function quickWater() {
     try {
-        const res = await fetch('/api/water', {method: 'POST'});
-        const result = await res.json();
+        const result = await API.addWater();
         if (result.success) {
             if (navigator.vibrate) navigator.vibrate(50);
             showToast(`💧 第${result.cup}杯水`);
             loadTodayData();
         }
-    } catch (e) {
-        showToast('记录失败');
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
     }
 }
 
 async function undoWater() {
     try {
-        const res = await fetch('/api/water/undo', {method: 'POST'});
-        const result = await res.json();
+        const result = await API.undoWater();
         if (result.success) {
-            showToast(`↩️ 已撤销`);
+            showToast('↩️ 已撤销');
             loadTodayData();
         } else {
             showToast('⚠️ 没有可撤销的记录');
         }
-    } catch (e) {
-        showToast('撤销失败');
+    } catch (error) {
+        showToast('撤销失败: ' + error.message);
     }
 }
 
 // 排尿
 async function quickPee() {
     try {
-        const res = await fetch('/api/pee', {method: 'POST'});
-        const result = await res.json();
+        const result = await API.addPee();
         if (result.success) {
             showToast(`🚽 排尿记录 ${result.time}`);
             loadTodayData();
         }
-    } catch (e) {
-        showToast('记录失败');
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
     }
 }
 
@@ -249,11 +474,14 @@ function setReminder() {
 // 排便
 function openPoopModal() {
     openModal('poop-modal');
-    setPoopStar(3);
+    AppState.setPoopStar(CONFIG.DEFAULT_SMOOTHNESS);
 }
 
 function setPoopStar(n) {
-    currentPoopStar = n;
+    AppState.setPoopStar(n);
+}
+
+function updatePoopStarUI(n) {
     document.querySelectorAll('.poop-star').forEach((btn, idx) => {
         if (btn) {
             btn.textContent = idx < n ? '⭐' : '☆';
@@ -265,35 +493,33 @@ function setPoopStar(n) {
 
 async function submitPoop() {
     const noteEl = get('poop-note');
-    const note = noteEl ? noteEl.value : '';
+    const note = truncate(noteEl ? noteEl.value : '', CONFIG.MAX_NOTE_LENGTH);
     
     try {
-        await fetch('/api/poop', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({smoothness: currentPoopStar, note})
+        await API.addPoop({
+            smoothness: AppState.currentPoopStar,
+            note: note
         });
         closeModal('poop-modal');
         showToast('💩 记录成功');
         if (noteEl) noteEl.value = '';
         loadTodayData();
-    } catch (e) {
-        showToast('记录失败');
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
     }
 }
 
 async function undoPoop() {
     try {
-        const res = await fetch('/api/poop/undo', {method: 'POST'});
-        const result = await res.json();
+        const result = await API.undoPoop();
         if (result.success) {
             showToast('↩️ 已撤销');
             loadTodayData();
         } else {
             showToast('⚠️ 没有可撤销的记录');
         }
-    } catch (e) {
-        showToast('撤销失败');
+    } catch (error) {
+        showToast('撤销失败: ' + error.message);
     }
 }
 
@@ -315,16 +541,12 @@ async function submitWake() {
     const time = timeEl ? timeEl.value : new Date().toTimeString().slice(0, 5);
     
     try {
-        await fetch('/api/sleep/wake', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({time})
-        });
+        await API.recordWake({ time });
         closeModal('wake-modal');
         showToast('⏰ 起床打卡成功');
         loadTodayData();
-    } catch (e) {
-        showToast('打卡失败');
+    } catch (error) {
+        showToast('打卡失败: ' + error.message);
     }
 }
 
@@ -333,21 +555,23 @@ async function submitBed() {
     const time = timeEl ? timeEl.value : new Date().toTimeString().slice(0, 5);
     
     try {
-        await fetch('/api/sleep/bed', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({time, sleepiness_level: 3})
+        await API.recordBed({
+            time,
+            sleepiness_level: CONFIG.DEFAULT_SLEEPINESS_LEVEL
         });
         closeModal('bed-modal');
         showToast('🌙 入睡打卡成功');
         loadTodayData();
-    } catch (e) {
-        showToast('打卡失败');
+    } catch (error) {
+        showToast('打卡失败: ' + error.message);
     }
 }
 
 function setSleepQuality(n) {
-    currentSleepQuality = n;
+    AppState.setSleepQuality(n);
+}
+
+function updateSleepQualityUI(n) {
     document.querySelectorAll('.quality-star').forEach((btn, idx) => {
         if (btn) btn.textContent = idx < n ? '⭐' : '☆';
     });
@@ -355,103 +579,93 @@ function setSleepQuality(n) {
 
 async function submitSleepQuality() {
     try {
-        await fetch('/api/sleep/quality', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({quality: currentSleepQuality})
-        });
+        await API.recordSleepQuality({ quality: AppState.currentSleepQuality });
         closeModal('sleep-quality-modal');
         showToast('📊 睡眠质量记录成功');
         loadTodayData();
-    } catch (e) {
-        showToast('记录失败');
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
     }
 }
 
-// 饮食（简化版）
-function openMealModal(type) {
-    // 简化处理，直接提示
+// 饮食
+async function openMealModal(type) {
     const food = prompt('吃了什么？');
     if (!food) return;
     
-    fetch('/api/meal', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
+    try {
+        await API.updateMeal({
             type: type,
-            food: food,
+            food: truncate(food, CONFIG.MAX_TEXT_LENGTH),
             time: new Date().toTimeString().slice(0, 5),
             duration: 20
-        })
-    }).then(() => {
+        });
         showToast('🍽️ 饮食记录成功');
         loadTodayData();
-    });
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
+    }
 }
 
-// 运动（简化版）
-function openSportModal() {
+// 运动
+async function openSportModal() {
     const type = prompt('运动类型？(跑步/游泳/高尔夫等)');
     if (!type) return;
     const duration = prompt('时长（分钟）？');
     
-    fetch('/api/sport', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            type: type,
+    try {
+        await API.addSport({
+            type: truncate(type, 50),
             duration: parseInt(duration) || 30,
-            intensity: 3
-        })
-    }).then(() => {
+            intensity: CONFIG.DEFAULT_INTENSITY
+        });
         showToast('🏃 运动记录成功');
         loadTodayData();
-    });
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
+    }
 }
 
-// 练嗓（简化版）
-function openVoiceModal() {
+// 练嗓
+async function openVoiceModal() {
     const duration = prompt('练嗓时长（分钟）？');
     if (!duration) return;
     
-    fetch('/api/voice', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
+    try {
+        await API.addVoice({
             duration: parseInt(duration),
             type: '发声'
-        })
-    }).then(() => {
+        });
         showToast('🎤 练嗓记录成功');
         loadTodayData();
-    });
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
+    }
 }
 
-// 自定义模块（简化版）
-function openCustomModal() {
+// 自定义模块
+async function openCustomModal() {
     const name = prompt('模块名称？');
     if (!name) return;
     const value = prompt('记录值？');
     
-    fetch('/api/custom', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            module_name: name,
-            value: value
-        })
-    }).then(() => {
+    try {
+        await API.addCustom({
+            module_name: truncate(name, 50),
+            value: truncate(value, CONFIG.MAX_TEXT_LENGTH)
+        });
         showToast('✅ 自定义记录成功');
         loadTodayData();
-    });
+    } catch (error) {
+        showToast('记录失败: ' + error.message);
+    }
 }
 
-// 数据看板（简化版）
+// 数据看板
 function loadDataDashboard() {
     showToast('📊 数据看板加载中...');
-    // 简化版，实际使用时可扩展
 }
 
 function loadWeeklyStats() {
-    // 简化版
+    // 实现图表加载
 }

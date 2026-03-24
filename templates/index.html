@@ -3,268 +3,546 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>健康追踪 Pro</title>
+    <title>HealthFlow - 健康生活助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-        .big-btn { min-height: 70px; font-size: 16px; }
-        .glass { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); }
-        .card { border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        body {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        
+        .glass-dark {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .card-gradient {
+            background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .btn-gradient-blue {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+        
+        .btn-gradient-purple {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+        
+        .btn-gradient-green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .btn-gradient-orange {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        
+        .btn-gradient-pink {
+            background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+        }
+        
+        .btn-gradient-cyan {
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .action-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .tab-indicator {
+            position: absolute;
+            bottom: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 3px 3px 0 0;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-enter {
+            animation: modalSlideIn 0.3s ease;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        .pulse-ring {
+            position: absolute;
+            border-radius: 50%;
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.33); opacity: 1; }
+            80%, 100% { transform: scale(2); opacity: 0; }
+        }
+        
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+        
+        @keyframes floating {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
         .hidden { display: none !important; }
-        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: bold; }
-        .tab-inactive { border-bottom: 3px solid transparent; color: #6b7280; }
+        
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        .log-item {
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .icon-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
     </style>
 </head>
-<body class="bg-gray-50 pb-24">
+<body class="text-gray-800">
     
-    <!-- 顶部 -->
-    <div class="sticky top-0 z-50 glass border-b px-4 py-3 flex justify-between items-center">
-        <h1 class="text-xl font-bold text-gray-800">🎯 健康追踪 Pro</h1>
-        <span id="current-date" class="text-sm text-gray-600"></span>
-    </div>
-
-    <!-- Tab切换 -->
-    <div class="sticky top-[57px] z-40 bg-white border-b flex">
-        <button onclick="switchTab('today')" id="tab-today" class="flex-1 py-3 text-center tab-active">今日打卡</button>
-        <button onclick="switchTab('data')" id="tab-data" class="flex-1 py-3 text-center tab-inactive">📊 数据看板</button>
-    </div>
-
-    <!-- ========== 今日打卡页面 ========== -->
-    <div id="page-today" class="block">
-        <!-- 今日概览 -->
-        <div class="p-4 grid grid-cols-2 gap-3">
-            <div class="card bg-blue-500 p-4 text-white">
-                <div class="text-3xl font-bold" id="water-count">0</div>
-                <div class="text-sm opacity-90">💧 喝水 (杯)</div>
-            </div>
-            <div class="card bg-amber-600 p-4 text-white">
-                <div class="text-3xl font-bold" id="poop-count">0</div>
-                <div class="text-sm opacity-90">💩 排便 (次)</div>
-            </div>
-            <div class="card bg-cyan-500 p-4 text-white">
-                <div class="text-3xl font-bold" id="pee-count">0</div>
-                <div class="text-sm opacity-90">🚽 排尿 (次)</div>
-            </div>
-            <div class="card bg-indigo-600 p-4 text-white">
-                <div class="text-xl font-bold" id="sleep-info">--</div>
-                <div class="text-sm opacity-90">😴 睡眠</div>
+    <!-- 顶部导航 -->
+    <div class="fixed top-0 left-0 right-0 z-50">
+        <div class="glass-panel px-4 py-4 shadow-lg">
+            <div class="flex justify-between items-center max-w-lg mx-auto">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                        H
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-800">HealthFlow</h1>
+                        <p class="text-xs text-gray-500" id="current-date">加载中...</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span class="text-xs text-gray-600">在线</span>
+                </div>
             </div>
         </div>
-
-        <!-- 睡眠管理区 -->
-        <div class="px-4 mb-6">
-            <h2 class="text-lg font-bold mb-3 text-gray-800">🌙 睡眠管理</h2>
-            <div class="bg-white card p-4">
-                <div class="mb-4 pb-4 border-b">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-semibold text-gray-700">今日计划</span>
-                        <button onclick="openSleepPlanModal()" class="text-sm text-indigo-600 font-medium">设置计划</button>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-500">起床: <span id="plan-wake" class="text-gray-800 font-medium">--:--</span></span>
-                        <span class="text-gray-500">入睡: <span id="plan-bed" class="text-gray-800 font-medium">--:--</span></span>
-                    </div>
-                    <!-- 这里添加睡眠记录显示区域 -->
-                    <div id="sleep-records" class="mt-3 text-sm text-gray-600 space-y-1"></div>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <button onclick="openWakeModal()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-3 rounded-xl font-medium transition">
-                        ⏰ 起床打卡
-                    </button>
-                    <button onclick="openBedModal()" class="bg-purple-100 hover:bg-purple-200 text-purple-700 py-3 rounded-xl font-medium transition">
-                        🌙 入睡打卡
-                    </button>
-                </div>
-                
-                <button onclick="openSleepQualityModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium transition">
-                    📊 昨晚睡眠质量评估
+        
+        <!-- Tab 切换 -->
+        <div class="glass-panel border-t">
+            <div class="relative flex max-w-lg mx-auto">
+                <button onclick="switchTab('today')" id="tab-today" class="flex-1 py-4 text-center relative font-medium text-blue-600">
+                    <span class="flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        今日打卡
+                    </span>
+                    <div class="tab-indicator" style="left: 25%; width: 50%;"></div>
+                </button>
+                <button onclick="switchTab('data')" id="tab-data" class="flex-1 py-4 text-center relative font-medium text-gray-500">
+                    <span class="flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        数据看板
+                    </span>
                 </button>
             </div>
         </div>
+    </div>
 
-        <!-- 快速记录区 -->
-        <div class="px-4 mb-6">
-            <h2 class="text-lg font-bold mb-3 text-gray-800">⚡ 快速记录</h2>
+    <!-- 主内容区 -->
+    <div class="pt-36 pb-8 px-4 max-w-lg mx-auto">
+        
+        <!-- ========== 今日打卡页面 ========== -->
+        <div id="page-today" class="block space-y-6">
             
-            <div class="grid grid-cols-3 gap-2 mb-3">
-                <div>
-                    <button onclick="quickWater()" class="big-btn w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                        <span class="text-xl">💧</span>
-                        <span class="text-xs">喝水</span>
-                    </button>
-                    <button onclick="undoWater()" class="w-full mt-1 py-1 bg-blue-100 text-blue-600 rounded-lg text-xs">↩️ 撤销</button>
+            <!-- 今日概览卡片 -->
+            <div class="glass-dark rounded-3xl p-6 text-white">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-white/80 text-sm font-medium">今日概览</span>
+                    <span class="px-3 py-1 bg-white/20 rounded-full text-xs">进行中</span>
                 </div>
-                <div>
-                    <button onclick="quickPee()" class="big-btn w-full bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                        <span class="text-xl">🚽</span>
-                        <span class="text-xs">排尿</span>
-                    </button>
-                    <button onclick="setReminder()" class="w-full mt-1 py-1 bg-cyan-100 text-cyan-600 rounded-lg text-xs">⏰ 提醒</button>
-                </div>
-                <div>
-                    <button onclick="openPoopModal()" class="big-btn w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                        <span class="text-xl">💩</span>
-                        <span class="text-xs">排便</span>
-                    </button>
-                    <button onclick="undoPoop()" class="w-full mt-1 py-1 bg-amber-100 text-amber-600 rounded-lg text-xs">↩️ 撤销</button>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="stat-card rounded-2xl p-4">
+                        <div class="icon-circle bg-blue-500/30 mb-2">💧</div>
+                        <div class="text-3xl font-bold" id="water-count">0</div>
+                        <div class="text-white/70 text-sm">杯水</div>
+                    </div>
+                    <div class="stat-card rounded-2xl p-4">
+                        <div class="icon-circle bg-amber-500/30 mb-2">💩</div>
+                        <div class="text-3xl font-bold" id="poop-count">0</div>
+                        <div class="text-white/70 text-sm">次排便</div>
+                    </div>
+                    <div class="stat-card rounded-2xl p-4">
+                        <div class="icon-circle bg-cyan-500/30 mb-2">🚽</div>
+                        <div class="text-3xl font-bold" id="pee-count">0</div>
+                        <div class="text-white/70 text-sm">次排尿</div>
+                    </div>
+                    <div class="stat-card rounded-2xl p-4">
+                        <div class="icon-circle bg-purple-500/30 mb-2">😴</div>
+                        <div class="text-xl font-bold" id="sleep-info">--</div>
+                        <div class="text-white/70 text-sm">睡眠</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-3 gap-2 mb-3">
-                <button onclick="openMealModal('breakfast')" class="big-btn bg-orange-400 hover:bg-orange-500 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                    <span class="text-xl">🍳</span>
-                    <span class="text-xs">早餐</span>
-                </button>
-                <button onclick="openMealModal('lunch')" class="big-btn bg-red-500 hover:bg-red-600 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                    <span class="text-xl">🍱</span>
-                    <span class="text-xs">午餐</span>
-                </button>
-                <button onclick="openMealModal('dinner')" class="big-btn bg-purple-500 hover:bg-purple-600 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                    <span class="text-xl">🍽️</span>
-                    <span class="text-xs">晚餐</span>
+            <!-- 睡眠管理卡片 -->
+            <div class="card-gradient rounded-3xl p-6 shadow-xl shadow-blue-500/5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl">
+                            🌙
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800">睡眠管理</h3>
+                            <p class="text-xs text-gray-500">规律作息，健康生活</p>
+                        </div>
+                    </div>
+                    <button onclick="openSleepPlanModal()" class="text-sm text-indigo-600 font-medium hover:text-indigo-700">
+                        设置计划
+                    </button>
+                </div>
+                
+                <div class="bg-gray-50 rounded-2xl p-4 mb-4">
+                    <div class="flex justify-between text-sm mb-3">
+                        <div class="text-center">
+                            <span class="text-gray-400 text-xs block mb-1">计划起床</span>
+                            <span id="plan-wake" class="text-gray-800 font-semibold text-lg">--:--</span>
+                        </div>
+                        <div class="flex items-center px-4">
+                            <div class="w-16 h-0.5 bg-gradient-to-r from-indigo-300 to-purple-300 rounded-full"></div>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-gray-400 text-xs block mb-1">计划入睡</span>
+                            <span id="plan-bed" class="text-gray-800 font-semibold text-lg">--:--</span>
+                        </div>
+                    </div>
+                    <div id="sleep-records" class="space-y-2 text-sm text-gray-600"></div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="openWakeModal()" class="action-btn bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3.5 rounded-xl font-medium shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2">
+                        <span>⏰</span> 起床打卡
+                    </button>
+                    <button onclick="openBedModal()" class="action-btn bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3.5 rounded-xl font-medium shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2">
+                        <span>🌙</span> 入睡打卡
+                    </button>
+                </div>
+                <button onclick="openSleepQualityModal()" class="action-btn w-full mt-3 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2">
+                    <span>📊</span> 昨晚睡眠质量评估
                 </button>
             </div>
 
-            <div class="grid grid-cols-2 gap-2 mb-3">
-                <button onclick="openSportModal()" class="big-btn bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                    <span class="text-xl">🏃</span>
-                    <span>运动记录</span>
-                </button>
-                <button onclick="openVoiceModal()" class="big-btn bg-pink-500 hover:bg-pink-600 text-white rounded-xl shadow flex flex-col items-center justify-center gap-1">
-                    <span class="text-xl">🎤</span>
-                    <span>练嗓打卡</span>
+            <!-- 快速记录区 -->
+            <div class="space-y-4">
+                <h3 class="font-bold text-white text-lg flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-sm">⚡</span>
+                    快速记录
+                </h3>
+                
+                <!-- 水分和排泄 -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="space-y-2">
+                        <button onclick="quickWater()" class="action-btn w-full btn-gradient-blue text-white rounded-2xl py-5 shadow-lg shadow-blue-500/30 flex flex-col items-center gap-2">
+                            <span class="text-3xl floating">💧</span>
+                            <span class="font-medium text-sm">喝水</span>
+                        </button>
+                        <button onclick="undoWater()" class="action-btn w-full py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs backdrop-blur-sm border border-white/20">
+                            ↩️ 撤销
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        <button onclick="quickPee()" class="action-btn w-full btn-gradient-cyan text-white rounded-2xl py-5 shadow-lg shadow-cyan-500/30 flex flex-col items-center gap-2">
+                            <span class="text-3xl">🚽</span>
+                            <span class="font-medium text-sm">排尿</span>
+                        </button>
+                        <button onclick="setReminder()" class="action-btn w-full py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs backdrop-blur-sm border border-white/20">
+                            ⏰ 提醒
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        <button onclick="openPoopModal()" class="action-btn w-full btn-gradient-orange text-white rounded-2xl py-5 shadow-lg shadow-orange-500/30 flex flex-col items-center gap-2">
+                            <span class="text-3xl">💩</span>
+                            <span class="font-medium text-sm">排便</span>
+                        </button>
+                        <button onclick="undoPoop()" class="action-btn w-full py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs backdrop-blur-sm border border-white/20">
+                            ↩️ 撤销
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 三餐 -->
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="openMealModal('breakfast')" class="action-btn bg-white rounded-2xl py-4 shadow-lg flex flex-col items-center gap-2 hover:scale-105 transition">
+                        <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-2xl">🍳</div>
+                        <span class="font-medium text-sm text-gray-700">早餐</span>
+                    </button>
+                    <button onclick="openMealModal('lunch')" class="action-btn bg-white rounded-2xl py-4 shadow-lg flex flex-col items-center gap-2 hover:scale-105 transition">
+                        <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-2xl">🍱</div>
+                        <span class="font-medium text-sm text-gray-700">午餐</span>
+                    </button>
+                    <button onclick="openMealModal('dinner')" class="action-btn bg-white rounded-2xl py-4 shadow-lg flex flex-col items-center gap-2 hover:scale-105 transition">
+                        <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-2xl">🍽️</div>
+                        <span class="font-medium text-sm text-gray-700">晚餐</span>
+                    </button>
+                </div>
+
+                <!-- 运动和练嗓 -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="openSportModal()" class="action-btn btn-gradient-green text-white rounded-2xl py-4 shadow-lg shadow-green-500/30 flex items-center justify-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">🏃</div>
+                        <span class="font-medium">运动记录</span>
+                    </button>
+                    <button onclick="openVoiceModal()" class="action-btn btn-gradient-pink text-white rounded-2xl py-4 shadow-lg shadow-pink-500/30 flex items-center justify-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">🎤</div>
+                        <span class="font-medium">练嗓打卡</span>
+                    </button>
+                </div>
+
+                <!-- 自定义 -->
+                <button onclick="openCustomModal()" class="action-btn w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 text-white rounded-2xl py-4 font-medium flex items-center justify-center gap-2 transition">
+                    <span class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">➕</span>
+                    自定义记录模块
                 </button>
             </div>
 
-            <button onclick="openCustomModal()" class="w-full py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium flex items-center justify-center gap-2">
-                <span>➕</span> 自定义模块
-            </button>
+            <!-- 今日详细记录 -->
+            <div class="card-gradient rounded-3xl p-6 shadow-xl">
+                <h3 class="font-bold text-gray-800 text-lg mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm">📝</span>
+                    今日记录详情
+                </h3>
+                <div id="today-logs" class="space-y-3"></div>
+            </div>
         </div>
 
-        <!-- 今日详细记录 -->
-        <div class="px-4 mb-6">
-            <h2 class="text-lg font-bold mb-3 text-gray-800">📝 今日详情</h2>
-            <div id="today-logs" class="space-y-2"></div>
+        <!-- ========== 数据看板页面 ========== -->
+        <div id="page-data" class="hidden space-y-6">
+            <!-- 关键指标 -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="glass-dark rounded-2xl p-4 text-white">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/30 flex items-center justify-center">💧</div>
+                        <span class="text-xs text-white/70">本周喝水</span>
+                    </div>
+                    <div class="text-2xl font-bold" id="avg-water">--</div>
+                    <div class="text-xs text-white/60 mt-1">平均 杯/天</div>
+                </div>
+                <div class="glass-dark rounded-2xl p-4 text-white">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center">😴</div>
+                        <span class="text-xs text-white/70">本周睡眠</span>
+                    </div>
+                    <div class="text-2xl font-bold" id="avg-sleep">--</div>
+                    <div class="text-xs text-white/60 mt-1">平均 小时/天</div>
+                </div>
+                <div class="glass-dark rounded-2xl p-4 text-white">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-green-500/30 flex items-center justify-center">🏃</div>
+                        <span class="text-xs text-white/70">本周运动</span>
+                    </div>
+                    <div class="text-2xl font-bold" id="total-sport">--</div>
+                    <div class="text-xs text-white/60 mt-1">总计 分钟</div>
+                </div>
+                <div class="glass-dark rounded-2xl p-4 text-white">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-orange-500/30 flex items-center justify-center">💩</div>
+                        <span class="text-xs text-white/70">本周排便</span>
+                    </div>
+                    <div class="text-2xl font-bold" id="total-poop">--</div>
+                    <div class="text-xs text-white/60 mt-1">总计 次</div>
+                </div>
+            </div>
+
+            <!-- 图表 -->
+            <div class="card-gradient rounded-3xl p-6 shadow-xl">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="text-xl">📈</span> 7天趋势
+                </h3>
+                <div class="relative h-48">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 饮食分析 -->
+            <div class="card-gradient rounded-3xl p-6 shadow-xl">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="text-xl">🥗</span> 饮食分析
+                </h3>
+                <div class="grid grid-cols-3 gap-3 mb-4">
+                    <div class="text-center p-4 bg-orange-50 rounded-2xl">
+                        <div class="text-2xl font-bold text-orange-600" id="meal-breakfast">0</div>
+                        <div class="text-xs text-gray-600 mt-1">早餐</div>
+                    </div>
+                    <div class="text-center p-4 bg-red-50 rounded-2xl">
+                        <div class="text-2xl font-bold text-red-600" id="meal-lunch">0</div>
+                        <div class="text-xs text-gray-600 mt-1">午餐</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-2xl">
+                        <div class="text-2xl font-bold text-purple-600" id="meal-dinner">0</div>
+                        <div class="text-xs text-gray-600 mt-1">晚餐</div>
+                    </div>
+                </div>
+                <div class="text-center text-sm text-gray-600 bg-gray-50 py-3 rounded-xl">
+                    平均用餐时长: <span id="avg-meal-time" class="font-bold text-gray-800">--</span> 分钟
+                </div>
+            </div>
+
+            <!-- 历史记录 -->
+            <div class="card-gradient rounded-3xl p-6 shadow-xl">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="text-xl">📋</span> 历史记录
+                </h3>
+                <div id="history-list" class="space-y-3 max-h-[400px] overflow-y-auto"></div>
+            </div>
         </div>
     </div>
 
-    <!-- ========== 数据看板页面 ========== -->
-    <div id="page-data" class="hidden px-4 py-4">
-        <!-- 关键指标 -->
-        <div class="grid grid-cols-2 gap-3 mb-6">
-            <div class="card bg-gradient-to-br from-blue-500 to-blue-600 p-4 text-white">
-                <div class="text-xs opacity-80 mb-1">本周平均喝水</div>
-                <div class="text-2xl font-bold" id="avg-water">-- 杯</div>
-                <div class="text-xs mt-1" id="total-water">总计: -- 杯</div>
-            </div>
-            <div class="card bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 text-white">
-                <div class="text-xs opacity-80 mb-1">本周平均睡眠</div>
-                <div class="text-2xl font-bold" id="avg-sleep">-- 小时</div>
-                <div class="text-xs mt-1" id="total-sleep">总计: -- 小时</div>
-            </div>
-            <div class="card bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 text-white">
-                <div class="text-xs opacity-80 mb-1">本周运动</div>
-                <div class="text-2xl font-bold" id="total-sport">-- 分钟</div>
-                <div class="text-xs mt-1" id="sport-times">-- 次</div>
-            </div>
-            <div class="card bg-gradient-to-br from-orange-500 to-orange-600 p-4 text-white">
-                <div class="text-xs opacity-80 mb-1">本周排便</div>
-                <div class="text-2xl font-bold" id="total-poop">-- 次</div>
-                <div class="text-xs mt-1" id="poop-avg">平均顺畅度: --</div>
-            </div>
-        </div>
-
-        <!-- 图表区域 -->
-        <div class="bg-white card p-4 mb-6">
-            <h3 class="font-bold text-gray-800 mb-4">📈 7天趋势</h3>
-            <canvas id="trendChart" height="200"></canvas>
-        </div>
-
-        <div class="bg-white card p-4 mb-6">
-            <h3 class="font-bold text-gray-800 mb-4">🥗 饮食分析</h3>
-            <div class="grid grid-cols-3 gap-2 text-center mb-3">
-                <div class="bg-orange-50 p-3 rounded-lg">
-                    <div class="text-xl font-bold text-orange-600" id="meal-breakfast">0</div>
-                    <div class="text-xs text-gray-600">早餐</div>
-                </div>
-                <div class="bg-red-50 p-3 rounded-lg">
-                    <div class="text-xl font-bold text-red-600" id="meal-lunch">0</div>
-                    <div class="text-xs text-gray-600">午餐</div>
-                </div>
-                <div class="bg-purple-50 p-3 rounded-lg">
-                    <div class="text-xl font-bold text-purple-600" id="meal-dinner">0</div>
-                    <div class="text-xs text-gray-600">晚餐</div>
-                </div>
-            </div>
-            <div class="text-sm text-gray-600 text-center">
-                平均用餐时长: <span id="avg-meal-time" class="font-bold">--</span> 分钟
-            </div>
-        </div>
-
-        <!-- 历史记录列表 -->
-        <div class="bg-white card p-4 mb-6">
-            <h3 class="font-bold text-gray-800 mb-4">📋 历史记录</h3>
-            <div id="history-list" class="space-y-3 max-h-[400px] overflow-y-auto"></div>
-        </div>
-    </div>
-
-    <!-- 各类模态框（保持之前的） -->
+    <!-- 模态框 -->
+    
     <!-- 排便模态框 -->
-    <div id="poop-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-6">
-            <h3 class="text-lg font-bold mb-4">排便顺畅度</h3>
-            <div class="flex justify-center gap-3 mb-6">
-                <button onclick="setPoopStar(1)" class="poop-star text-3xl text-gray-300 hover:text-amber-500 transition">⭐</button>
-                <button onclick="setPoopStar(2)" class="poop-star text-3xl text-gray-300 hover:text-amber-500 transition">⭐</button>
-                <button onclick="setPoopStar(3)" class="poop-star text-3xl text-gray-300 hover:text-amber-500 transition">⭐</button>
-                <button onclick="setPoopStar(4)" class="poop-star text-3xl text-gray-300 hover:text-amber-500 transition">⭐</button>
-                <button onclick="setPoopStar(5)" class="poop-star text-3xl text-gray-300 hover:text-amber-500 transition">⭐</button>
+    <div id="poop-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 modal-enter shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center text-3xl mx-auto mb-3">💩</div>
+                <h3 class="text-xl font-bold text-gray-800">排便顺畅度</h3>
+                <p class="text-sm text-gray-500 mt-1">请选择今天的排便体验</p>
             </div>
-            <input type="text" id="poop-note" placeholder="备注（可选）" class="w-full border rounded-lg p-3 mb-4">
+            <div class="flex justify-center gap-2 mb-6">
+                <button onclick="setPoopStar(1)" class="poop-star text-3xl text-gray-200 hover:text-amber-400 transition p-2">⭐</button>
+                <button onclick="setPoopStar(2)" class="poop-star text-3xl text-gray-200 hover:text-amber-400 transition p-2">⭐</button>
+                <button onclick="setPoopStar(3)" class="poop-star text-3xl text-gray-200 hover:text-amber-400 transition p-2">⭐</button>
+                <button onclick="setPoopStar(4)" class="poop-star text-3xl text-gray-200 hover:text-amber-400 transition p-2">⭐</button>
+                <button onclick="setPoopStar(5)" class="poop-star text-3xl text-gray-200 hover:text-amber-400 transition p-2">⭐</button>
+            </div>
+            <textarea id="poop-note" placeholder="添加备注（可选）..." class="w-full bg-gray-50 border-0 rounded-xl p-4 mb-4 text-sm resize-none focus:ring-2 focus:ring-amber-500/20 focus:bg-white transition" rows="3"></textarea>
             <div class="flex gap-3">
-                <button onclick="closeModal('poop-modal')" class="flex-1 bg-gray-200 py-3 rounded-xl font-medium">取消</button>
-                <button onclick="submitPoop()" class="flex-1 bg-amber-600 text-white py-3 rounded-xl font-medium">记录</button>
+                <button onclick="closeModal('poop-modal')" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3.5 rounded-xl font-medium transition">取消</button>
+                <button onclick="submitPoop()" class="flex-1 btn-gradient-orange text-white py-3.5 rounded-xl font-medium shadow-lg shadow-orange-500/30">记录</button>
             </div>
         </div>
     </div>
 
-    <!-- 起床打卡 -->
-    <div id="wake-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-6">
-            <h3 class="text-lg font-bold mb-4">⏰ 起床打卡</h3>
-            <input type="time" id="actual-wake-time" class="w-full border rounded-lg p-3 mb-3">
+    <!-- 起床打卡模态框 -->
+    <div id="wake-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 modal-enter shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-2xl bg-indigo-100 flex items-center justify-center text-3xl mx-auto mb-3">⏰</div>
+                <h3 class="text-xl font-bold text-gray-800">起床打卡</h3>
+                <p class="text-sm text-gray-500 mt-1">新的一天，加油！</p>
+            </div>
+            <div class="bg-gray-50 rounded-2xl p-4 mb-6">
+                <label class="text-xs text-gray-500 block mb-2">实际起床时间</label>
+                <input type="time" id="actual-wake-time" class="w-full bg-white border-0 rounded-xl p-4 text-center text-2xl font-bold text-gray-800 focus:ring-2 focus:ring-indigo-500/20">
+            </div>
             <div class="flex gap-3">
-                <button onclick="closeModal('wake-modal')" class="flex-1 bg-gray-200 py-3 rounded-xl">取消</button>
-                <button onclick="submitWake()" class="flex-1 bg-indigo-600 text-white py-3 rounded-xl">确认</button>
+                <button onclick="closeModal('wake-modal')" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3.5 rounded-xl font-medium transition">取消</button>
+                <button onclick="submitWake()" class="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3.5 rounded-xl font-medium shadow-lg shadow-indigo-500/30">确认打卡</button>
             </div>
         </div>
     </div>
 
-    <!-- 入睡打卡 -->
-    <div id="bed-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-6">
-            <h3 class="text-lg font-bold mb-4">🌙 入睡打卡</h3>
-            <input type="time" id="actual-bed-time" class="w-full border rounded-lg p-3 mb-3">
-            <button onclick="closeModal('bed-modal')" class="w-full bg-gray-200 py-3 rounded-xl mb-2">取消</button>
-            <button onclick="submitBed()" class="w-full bg-purple-600 text-white py-3 rounded-xl">确认</button>
+    <!-- 入睡打卡模态框 -->
+    <div id="bed-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 modal-enter shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center text-3xl mx-auto mb-3">🌙</div>
+                <h3 class="text-xl font-bold text-gray-800">入睡打卡</h3>
+                <p class="text-sm text-gray-500 mt-1">好好休息，晚安~</p>
+            </div>
+            <div class="bg-gray-50 rounded-2xl p-4 mb-6">
+                <label class="text-xs text-gray-500 block mb-2">实际入睡时间</label>
+                <input type="time" id="actual-bed-time" class="w-full bg-white border-0 rounded-xl p-4 text-center text-2xl font-bold text-gray-800 focus:ring-2 focus:ring-purple-500/20">
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeModal('bed-modal')" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3.5 rounded-xl font-medium transition">取消</button>
+                <button onclick="submitBed()" class="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3.5 rounded-xl font-medium shadow-lg shadow-purple-500/30">确认打卡</button>
+            </div>
         </div>
     </div>
 
-    <!-- 睡眠质量 -->
-    <div id="sleep-quality-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-6">
-            <h3 class="text-lg font-bold mb-4">📊 昨晚睡眠质量</h3>
-            <div class="flex justify-center gap-3 mb-4">
-                <button onclick="setSleepQuality(1)" class="quality-star text-3xl text-gray-300">⭐</button>
-                <button onclick="setSleepQuality(2)" class="quality-star text-3xl text-gray-300">⭐</button>
-                <button onclick="setSleepQuality(3)" class="quality-star text-3xl text-gray-300">⭐</button>
-                <button onclick="setSleepQuality(4)" class="quality-star text-3xl text-gray-300">⭐</button>
-                <button onclick="setSleepQuality(5)" class="quality-star text-3xl text-gray-300">⭐</button>
+    <!-- 睡眠质量模态框 -->
+    <div id="sleep-quality-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 modal-enter shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center text-3xl mx-auto mb-3">📊</div>
+                <h3 class="text-xl font-bold text-gray-800">昨晚睡眠质量</h3>
+                <p class="text-sm text-gray-500 mt-1">睡得怎么样？</p>
             </div>
-            <button onclick="closeModal('sleep-quality-modal')" class="w-full bg-gray-200 py-3 rounded-xl mb-2">取消</button>
-            <button onclick="submitSleepQuality()" class="w-full bg-indigo-600 text-white py-3 rounded-xl">保存</button>
+            <div class="flex justify-center gap-2 mb-6">
+                <button onclick="setSleepQuality(1)" class="quality-star text-3xl text-gray-200 hover:text-yellow-400 transition p-2">⭐</button>
+                <button onclick="setSleepQuality(2)" class="quality-star text-3xl text-gray-200 hover:text-yellow-400 transition p-2">⭐</button>
+                <button onclick="setSleepQuality(3)" class="quality-star text-3xl text-gray-200 hover:text-yellow-400 transition p-2">⭐</button>
+                <button onclick="setSleepQuality(4)" class="quality-star text-3xl text-gray-200 hover:text-yellow-400 transition p-2">⭐</button>
+                <button onclick="setSleepQuality(5)" class="quality-star text-3xl text-gray-200 hover:text-yellow-400 transition p-2">⭐</button>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeModal('sleep-quality-modal')" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3.5 rounded-xl font-medium transition">取消</button>
+                <button onclick="submitSleepQuality()" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3.5 rounded-xl font-medium shadow-lg shadow-blue-500/30">保存</button>
+            </div>
         </div>
     </div>
 
