@@ -11,77 +11,76 @@ const CONFIG = {
 };
 
 // ============================================
-// 状态管理（替代全局变量）
+// 状态管理
 // ============================================
 const AppState = {
     currentPoopStar: CONFIG.DEFAULT_SMOOTHNESS,
-    currentSleepQuality: 3,
-    
+    currentSleepStar: 3,
+    currentSportStar: CONFIG.DEFAULT_INTENSITY,
+    selectedMealType: null,
+
     setPoopStar(n) {
         this.currentPoopStar = n;
-        updatePoopStarUI(n);
+        updateStarUI('poop-stars', n);
     },
-    
-    setSleepQuality(n) {
-        this.currentSleepQuality = n;
-        updateSleepQualityUI(n);
+
+    setSleepStar(n) {
+        this.currentSleepStar = n;
+        updateStarUI('sleep-stars', n);
+    },
+
+    setSportStar(n) {
+        this.currentSportStar = n;
+        updateStarUI('sport-stars', n);
     }
 };
 
 // ============================================
 // 工具函数
 // ============================================
-
-/**
- * 安全获取元素
- */
 function get(id) {
     return document.getElementById(id);
 }
 
-/**
- * XSS 防护：转义 HTML 特殊字符
- */
-function escapeHtml(text) {
-    if (text == null) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
+function showToast(msg) {
+    const toast = get('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
-/**
- * 安全设置 textContent
- */
-function setText(id, text) {
-    const el = get(id);
-    if (el) el.textContent = text;
+function openModal(id) {
+    get(id).classList.add('active');
 }
 
-/**
- * 安全设置 value
- */
-function setValue(id, val) {
-    const el = get(id);
-    if (el) el.value = val;
+function closeModal(id) {
+    get(id).classList.remove('active');
 }
 
-/**
- * 截断文本
- */
-function truncate(str, maxLength) {
-    if (!str) return '';
-    str = String(str);
-    return str.length > maxLength ? str.substring(0, maxLength) : str;
+function updateStarUI(containerId, count) {
+    const container = get(containerId);
+    if (!container) return;
+    const stars = container.querySelectorAll('.star-btn');
+    stars.forEach((btn, idx) => {
+        btn.classList.toggle('active', idx < count);
+    });
+}
+
+function formatDate(date) {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    return `${month}月${day}日 ${weekdays[date.getDay()]}`;
 }
 
 // ============================================
-// API 层 - 统一处理请求
+// API 层
 // ============================================
 const API = {
     async request(url, options = {}) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
-        
+
         try {
             const res = await fetch(url, {
                 ...options,
@@ -92,409 +91,254 @@ const API = {
                 }
             });
             clearTimeout(timeoutId);
-            
+
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
                 throw new Error(errorData.error || `HTTP ${res.status}`);
             }
-            
+
             return await res.json();
         } catch (error) {
             if (error.name === 'AbortError') {
-                throw new Error('请求超时，请检查网络');
+                throw new Error('请求超时');
             }
             throw error;
         }
     },
-    
+
     async get(url) {
         return this.request(url, { method: 'GET' });
     },
-    
+
     async post(url, data = {}) {
         return this.request(url, {
             method: 'POST',
             body: JSON.stringify(data)
         });
     },
-    
-    // 具体 API 方法
-    async getToday() {
+
+    getToday() {
         return this.get('/api/today');
     },
-    
-    async addWater() {
+
+    addWater() {
         return this.post('/api/water');
     },
-    
-    async undoWater() {
-        return this.post('/api/water/undo');
-    },
-    
-    async addPee() {
+
+    addPee() {
         return this.post('/api/pee');
     },
-    
-    async addPoop(data) {
+
+    addPoop(data) {
         return this.post('/api/poop', data);
     },
-    
-    async undoPoop() {
-        return this.post('/api/poop/undo');
-    },
-    
-    async updateMeal(data) {
+
+    updateMeal(data) {
         return this.post('/api/meal', data);
     },
-    
-    async recordWake(data) {
-        return this.post('/api/sleep/wake', data);
-    },
-    
-    async recordBed(data) {
-        return this.post('/api/sleep/bed', data);
-    },
-    
-    async recordSleepQuality(data) {
-        return this.post('/api/sleep/quality', data);
-    },
-    
-    async addSport(data) {
+
+    addSport(data) {
         return this.post('/api/sport', data);
     },
-    
-    async addVoice(data) {
-        return this.post('/api/voice', data);
-    },
-    
-    async addCustom(data) {
-        return this.post('/api/custom', data);
+
+    recordSleep(data) {
+        return this.post('/api/sleep/quality', data);
     }
 };
 
 // ============================================
-// UI 渲染函数（使用 textContent 防止 XSS）
+// UI 更新
 // ============================================
-
-/**
- * 更新仪表盘
- */
 function updateDashboard(data) {
-    const waterCount = data.water_logs ? data.water_logs.length : 0;
-    const peeCount = data.pee_logs ? data.pee_logs.length : 0;
-    const poopCount = data.poop_logs ? data.poop_logs.length : 0;
-    
-    setText('water-count', waterCount);
-    setText('pee-count', peeCount);
-    setText('poop-count', poopCount);
-    
+    const waterCount = data.water_logs?.length || 0;
+    const peeCount = data.pee_logs?.length || 0;
+    const poopCount = data.poop_logs?.length || 0;
+
+    get('water-count').textContent = waterCount;
+    get('pee-count').textContent = peeCount;
+    get('poop-count').textContent = poopCount;
+
     // 睡眠信息
     let sleepText = '--';
-    if (data.sleep_duration) {
-        sleepText = data.sleep_duration + 'h';
-    } else if (data.wake_up_actual || data.bed_time_actual) {
+    if (data.wake_up_actual && data.bed_time_actual) {
         sleepText = '已记录';
+    } else if (data.wake_up_actual) {
+        sleepText = data.wake_up_actual;
+    } else if (data.bed_time_actual) {
+        sleepText = data.bed_time_actual;
     }
-    setText('sleep-info', sleepText);
-    
-    // 运动分钟数
-    let sportMinutes = 0;
-    if (data.sports) {
-        sportMinutes = data.sports.reduce((sum, s) => sum + (s.duration || 0), 0);
-    }
-    setText('sport-count', sportMinutes);
+    get('sleep-info').textContent = sleepText;
 }
 
-/**
- * 更新睡眠显示（安全渲染）
- */
-function updateSleepDisplay(data) {
-    const container = get('sleep-records');
-    if (!container) return;
-    
-    // 使用 DocumentFragment 安全构建 DOM
-    const fragment = document.createDocumentFragment();
-    
-    if (data.wake_up_actual) {
-        const div = document.createElement('div');
-        const lateText = data.is_late ? ` (晚了${data.late_minutes}分钟)` : '';
-        div.textContent = `⏰ 起床: ${data.wake_up_actual}${lateText}`;
-        fragment.appendChild(div);
-    }
-    
-    if (data.bed_time_actual) {
-        const div = document.createElement('div');
-        const sleepyText = data.sleepiness_level ? ` (困意${data.sleepiness_level}/5)` : '';
-        div.textContent = `🌙 入睡: ${data.bed_time_actual}${sleepyText}`;
-        fragment.appendChild(div);
-    }
-    
-    if (data.sleep_quality) {
-        const div = document.createElement('div');
-        div.textContent = `📊 昨晚质量: ${'⭐'.repeat(data.sleep_quality)}`;
-        fragment.appendChild(div);
-    }
-    
-    if (!fragment.hasChildNodes()) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'text-gray-400';
-        emptyDiv.textContent = '今日尚未记录睡眠';
-        fragment.appendChild(emptyDiv);
-    }
-    
-    container.innerHTML = '';
-    container.appendChild(fragment);
-}
-
-/**
- * 渲染日志列表（安全渲染）
- */
 function renderLogs(data) {
     const container = get('today-logs');
-    if (!container) return;
-    
-    const fragment = document.createDocumentFragment();
-    
+    const logs = [];
+
     // 喝水记录
-    if (data.water_logs && data.water_logs.length > 0) {
-        const div = document.createElement('div');
-        div.className = 'bg-blue-50 p-3 rounded-xl flex justify-between items-center';
-        div.innerHTML = `
-            <span>💧 喝水 x${escapeHtml(data.water_logs.length)}</span>
-            <span class="text-gray-500 text-sm">最新: ${escapeHtml(data.water_logs[data.water_logs.length-1])}</span>
-        `;
-        fragment.appendChild(div);
+    if (data.water_logs?.length > 0) {
+        const lastTime = data.water_logs[data.water_logs.length - 1];
+        logs.push({
+            icon: '💧',
+            bg: 'linear-gradient(135deg, #E3F2FD, #BBDEFB)',
+            title: `喝水 x${data.water_logs.length}`,
+            time: `最新 ${lastTime}`,
+            value: `${data.water_logs.length}杯`
+        });
     }
-    
+
     // 排尿记录
-    if (data.pee_logs && data.pee_logs.length > 0) {
-        const div = document.createElement('div');
-        div.className = 'bg-cyan-50 p-3 rounded-xl flex justify-between items-center';
-        div.innerHTML = `<span>🚽 排尿 x${escapeHtml(data.pee_logs.length)}</span>`;
-        fragment.appendChild(div);
+    if (data.pee_logs?.length > 0) {
+        const lastTime = data.pee_logs[data.pee_logs.length - 1];
+        logs.push({
+            icon: '🚽',
+            bg: 'linear-gradient(135deg, #E0F7FA, #B2EBF2)',
+            title: `排尿 x${data.pee_logs.length}`,
+            time: `最新 ${lastTime.time || '刚刚'}`,
+            value: `${data.pee_logs.length}次`
+        });
     }
-    
+
     // 排便记录
-    if (data.poop_logs && data.poop_logs.length > 0) {
-        const last = data.poop_logs[data.poop_logs.length-1];
-        const div = document.createElement('div');
-        div.className = 'bg-amber-50 p-3 rounded-xl flex justify-between items-center';
-        div.innerHTML = `
-            <span>💩 排便 ${'⭐'.repeat(last.smoothness || 3)}</span>
-            <span class="text-gray-500 text-sm">${escapeHtml(last.time)}</span>
-        `;
-        fragment.appendChild(div);
+    if (data.poop_logs?.length > 0) {
+        const last = data.poop_logs[data.poop_logs.length - 1];
+        logs.push({
+            icon: '💩',
+            bg: 'linear-gradient(135deg, #FFF3E0, #FFE0B2)',
+            title: '排便 ' + '⭐'.repeat(last.smoothness || 3),
+            time: last.time,
+            value: last.note || '无备注'
+        });
     }
-    
+
     // 三餐记录
     if (data.meals) {
-        const icons = {breakfast: '🍳', lunch: '🍱', dinner: '🍽️'};
-        const names = {breakfast: '早餐', lunch: '午餐', dinner: '晚餐'};
-        
+        const icons = { breakfast: '🍳', lunch: '🍱', dinner: '🍲' };
+        const names = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐' };
+        const bgs = {
+            breakfast: 'linear-gradient(135deg, #E8F5E9, #C8E6C9)',
+            lunch: 'linear-gradient(135deg, #FFEBEE, #FFCDD2)',
+            dinner: 'linear-gradient(135deg, #F3E5F5, #E1BEE7)'
+        };
+
         ['breakfast', 'lunch', 'dinner'].forEach(type => {
             const meal = data.meals[type];
-            if (meal && meal.time) {
-                const div = document.createElement('div');
-                div.className = 'bg-orange-50 p-3 rounded-xl flex justify-between items-center';
-                div.innerHTML = `
-                    <div>
-                        <span>${icons[type]} ${escapeHtml(meal.food || '未备注')}</span>
-                        <div class="text-xs text-gray-500">${escapeHtml(meal.duration || 0)}分钟</div>
-                    </div>
-                    <span class="text-gray-500 text-sm">${escapeHtml(meal.time)}</span>
-                `;
-                fragment.appendChild(div);
+            if (meal?.time) {
+                logs.push({
+                    icon: icons[type],
+                    bg: bgs[type],
+                    title: names[type],
+                    time: meal.time,
+                    value: meal.food || '未备注'
+                });
             }
         });
     }
-    
-    if (!fragment.hasChildNodes()) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'text-gray-400 text-center py-4';
-        emptyDiv.textContent = '今日暂无记录';
-        fragment.appendChild(emptyDiv);
+
+    // 运动记录
+    if (data.sports?.length > 0) {
+        data.sports.forEach(sport => {
+            logs.push({
+                icon: '🏃',
+                bg: 'linear-gradient(135deg, #FCE4EC, #F8BBD9)',
+                title: sport.type || '运动',
+                time: sport.time || '刚刚',
+                value: `${sport.duration}分钟`
+            });
+        });
     }
-    
-    container.innerHTML = '';
-    container.appendChild(fragment);
+
+    // 睡眠记录
+    if (data.sleep_quality) {
+        logs.push({
+            icon: '😴',
+            bg: 'linear-gradient(135deg, #EDE7F6, #D1C4E9)',
+            title: '睡眠质量',
+            time: data.bed_time_actual || '',
+            value: '⭐'.repeat(data.sleep_quality)
+        });
+    }
+
+    // 渲染
+    if (logs.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📝</div>
+                <div>今天还没有记录哦</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = logs.map(log => `
+        <div class="log-item">
+            <div class="log-icon" style="background: ${log.bg}">${log.icon}</div>
+            <div class="log-content">
+                <div class="log-title">${log.title}</div>
+                <div class="log-time">${log.time}</div>
+            </div>
+            <div class="log-value">${log.value}</div>
+        </div>
+    `).join('');
 }
 
 // ============================================
-// 初始化
+// 数据加载
 // ============================================
-document.addEventListener('DOMContentLoaded', () => {
-    // 设置日期
-    const dateEl = get('current-date');
-    if (dateEl) dateEl.textContent = new Date().toLocaleDateString('zh-CN');
-    
-    // 设置默认时间
-    const now = new Date().toTimeString().slice(0, 5);
-    setValue('actual-wake-time', now);
-    setValue('actual-bed-time', now);
-    
-    // 加载数据
-    loadTodayData();
-    
-    // 初始化图表
-    if (get('trendChart')) {
-        loadWeeklyStats();
-    }
-});
-
-/**
- * 加载今日数据
- */
 async function loadTodayData() {
     try {
         const data = await API.getToday();
         updateDashboard(data);
         renderLogs(data);
-        updateSleepDisplay(data);
     } catch (error) {
         console.error('加载失败:', error);
-        showToast('加载数据失败: ' + error.message);
+        showToast('加载失败: ' + error.message);
     }
 }
 
 // ============================================
-// 通用 UI 函数
+// 快速操作
 // ============================================
-
-function openModal(id) {
-    const el = get(id);
-    if (el) el.classList.remove('hidden');
-}
-
-function closeModal(id) {
-    const el = get(id);
-    if (el) el.classList.add('hidden');
-}
-
-function showToast(msg) {
-    const div = document.createElement('div');
-    div.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50';
-    div.textContent = msg;
-    document.body.appendChild(div);
-    setTimeout(() => div.remove(), 2000);
-}
-
-// Tab 切换
-function switchTab(tab) {
-    const todayPage = get('page-today');
-    const dataPage = get('page-data');
-    const todayTab = get('tab-today');
-    const dataTab = get('tab-data');
-    const todayIndicator = todayTab?.querySelector('.tab-indicator');
-    const dataIndicator = dataTab?.querySelector('.tab-indicator');
-    
-    if (!todayPage || !dataPage) return;
-    
-    if (tab === 'today') {
-        todayPage.classList.remove('hidden');
-        dataPage.classList.add('hidden');
-        if (todayTab) {
-            todayTab.className = 'flex-1 py-4 text-center relative font-medium text-blue-600';
-        }
-        if (dataTab) {
-            dataTab.className = 'flex-1 py-4 text-center relative font-medium text-gray-500';
-        }
-        if (todayIndicator) todayIndicator.style.display = 'block';
-        if (dataIndicator) dataIndicator.style.display = 'none';
-        loadTodayData();
-    } else {
-        todayPage.classList.add('hidden');
-        dataPage.classList.remove('hidden');
-        if (todayTab) {
-            todayTab.className = 'flex-1 py-4 text-center relative font-medium text-gray-500';
-        }
-        if (dataTab) {
-            dataTab.className = 'flex-1 py-4 text-center relative font-medium text-blue-600';
-        }
-        if (todayIndicator) todayIndicator.style.display = 'none';
-        if (dataIndicator) dataIndicator.style.display = 'block';
-    }
-}
-
-// ============================================
-// 具体功能函数
-// ============================================
-
-// 喝水
 async function quickWater() {
     try {
         const result = await API.addWater();
         if (result.success) {
-            if (navigator.vibrate) navigator.vibrate(50);
             showToast(`💧 第${result.cup}杯水`);
+            if (navigator.vibrate) navigator.vibrate(50);
             loadTodayData();
         }
     } catch (error) {
-        showToast('记录失败: ' + error.message);
+        showToast('记录失败');
     }
 }
 
-async function undoWater() {
-    try {
-        const result = await API.undoWater();
-        if (result.success) {
-            showToast('↩️ 已撤销');
-            loadTodayData();
-        } else {
-            showToast('⚠️ 没有可撤销的记录');
-        }
-    } catch (error) {
-        showToast('撤销失败: ' + error.message);
-    }
-}
-
-// 排尿
 async function quickPee() {
     try {
         const result = await API.addPee();
         if (result.success) {
-            showToast(`🚽 排尿记录 ${result.time}`);
+            showToast('🚽 排尿已记录');
             loadTodayData();
         }
     } catch (error) {
-        showToast('记录失败: ' + error.message);
+        showToast('记录失败');
     }
 }
 
-function setReminder() {
-    if ('Notification' in window) {
-        Notification.requestPermission().then(perm => {
-            if (perm === 'granted') {
-                showToast('⏰ 已开启整点提醒');
-                localStorage.setItem('peeReminder', 'true');
-            }
-        });
-    }
-}
-
-// 排便
+// ============================================
+// 模态框操作
+// ============================================
 function openPoopModal() {
     openModal('poop-modal');
     AppState.setPoopStar(CONFIG.DEFAULT_SMOOTHNESS);
+    get('poop-note').value = '';
 }
 
 function setPoopStar(n) {
     AppState.setPoopStar(n);
 }
 
-function updatePoopStarUI(n) {
-    document.querySelectorAll('.poop-star').forEach((btn, idx) => {
-        if (btn) {
-            btn.textContent = idx < n ? '⭐' : '☆';
-            btn.classList.toggle('text-amber-500', idx < n);
-            btn.classList.toggle('text-gray-300', idx >= n);
-        }
-    });
-}
-
 async function submitPoop() {
-    const noteEl = get('poop-note');
-    const note = truncate(noteEl ? noteEl.value : '', CONFIG.MAX_NOTE_LENGTH);
-    
+    const note = get('poop-note').value.slice(0, CONFIG.MAX_NOTE_LENGTH);
+
     try {
         await API.addPoop({
             smoothness: AppState.currentPoopStar,
@@ -502,170 +346,173 @@ async function submitPoop() {
         });
         closeModal('poop-modal');
         showToast('💩 记录成功');
-        if (noteEl) noteEl.value = '';
         loadTodayData();
     } catch (error) {
-        showToast('记录失败: ' + error.message);
+        showToast('记录失败');
     }
 }
 
-async function undoPoop() {
-    try {
-        const result = await API.undoPoop();
-        if (result.success) {
-            showToast('↩️ 已撤销');
-            loadTodayData();
-        } else {
-            showToast('⚠️ 没有可撤销的记录');
-        }
-    } catch (error) {
-        showToast('撤销失败: ' + error.message);
-    }
+// 用餐
+function openMealModal() {
+    openModal('meal-modal');
+    AppState.selectedMealType = null;
+    document.querySelectorAll('.meal-option').forEach(opt => opt.classList.remove('selected'));
+    get('meal-food').value = '';
+    get('meal-duration').value = '20';
 }
 
-// 睡眠
-function openWakeModal() {
-    openModal('wake-modal');
-}
-
-function openBedModal() {
-    openModal('bed-modal');
-}
-
-function openSleepQualityModal() {
-    openModal('sleep-quality-modal');
-}
-
-async function submitWake() {
-    const timeEl = get('actual-wake-time');
-    const time = timeEl ? timeEl.value : new Date().toTimeString().slice(0, 5);
-    
-    try {
-        await API.recordWake({ time });
-        closeModal('wake-modal');
-        showToast('⏰ 起床打卡成功');
-        loadTodayData();
-    } catch (error) {
-        showToast('打卡失败: ' + error.message);
-    }
-}
-
-async function submitBed() {
-    const timeEl = get('actual-bed-time');
-    const time = timeEl ? timeEl.value : new Date().toTimeString().slice(0, 5);
-    
-    try {
-        await API.recordBed({
-            time,
-            sleepiness_level: CONFIG.DEFAULT_SLEEPINESS_LEVEL
-        });
-        closeModal('bed-modal');
-        showToast('🌙 入睡打卡成功');
-        loadTodayData();
-    } catch (error) {
-        showToast('打卡失败: ' + error.message);
-    }
-}
-
-function setSleepQuality(n) {
-    AppState.setSleepQuality(n);
-}
-
-function updateSleepQualityUI(n) {
-    document.querySelectorAll('.quality-star').forEach((btn, idx) => {
-        if (btn) btn.textContent = idx < n ? '⭐' : '☆';
+function selectMeal(type) {
+    AppState.selectedMealType = type;
+    document.querySelectorAll('.meal-option').forEach(opt => {
+        opt.classList.toggle('selected', opt.dataset.type === type);
     });
 }
 
-async function submitSleepQuality() {
-    try {
-        await API.recordSleepQuality({ quality: AppState.currentSleepQuality });
-        closeModal('sleep-quality-modal');
-        showToast('📊 睡眠质量记录成功');
-        loadTodayData();
-    } catch (error) {
-        showToast('记录失败: ' + error.message);
+async function submitMeal() {
+    if (!AppState.selectedMealType) {
+        showToast('请选择餐次');
+        return;
     }
-}
 
-// 饮食
-async function openMealModal(type) {
-    const food = prompt('吃了什么？');
-    if (!food) return;
-    
+    const food = get('meal-food').value.slice(0, CONFIG.MAX_TEXT_LENGTH);
+    const duration = parseInt(get('meal-duration').value) || 20;
+
     try {
         await API.updateMeal({
-            type: type,
-            food: truncate(food, CONFIG.MAX_TEXT_LENGTH),
-            time: new Date().toTimeString().slice(0, 5),
-            duration: 20
+            type: AppState.selectedMealType,
+            food: food,
+            duration: duration,
+            time: new Date().toTimeString().slice(0, 5)
         });
-        showToast('🍽️ 饮食记录成功');
+        closeModal('meal-modal');
+        showToast('🍽️ 用餐已记录');
         loadTodayData();
     } catch (error) {
-        showToast('记录失败: ' + error.message);
+        showToast('记录失败');
     }
 }
 
 // 运动
-async function openSportModal() {
-    const type = prompt('运动类型？(跑步/游泳/高尔夫等)');
-    if (!type) return;
-    const duration = prompt('时长（分钟）？');
-    
+function openSportModal() {
+    openModal('sport-modal');
+    AppState.setSportStar(CONFIG.DEFAULT_INTENSITY);
+    get('sport-type').value = '';
+    get('sport-duration').value = '30';
+}
+
+function setSportStar(n) {
+    AppState.setSportStar(n);
+}
+
+async function submitSport() {
+    const type = get('sport-type').value.slice(0, 50);
+    const duration = parseInt(get('sport-duration').value) || 30;
+
+    if (!type) {
+        showToast('请输入运动类型');
+        return;
+    }
+
     try {
         await API.addSport({
-            type: truncate(type, 50),
-            duration: parseInt(duration) || 30,
-            intensity: CONFIG.DEFAULT_INTENSITY
+            type: type,
+            duration: duration,
+            intensity: AppState.currentSportStar
         });
-        showToast('🏃 运动记录成功');
+        closeModal('sport-modal');
+        showToast('🏃 运动已记录');
         loadTodayData();
     } catch (error) {
-        showToast('记录失败: ' + error.message);
+        showToast('记录失败');
     }
 }
 
-// 练嗓
-async function openVoiceModal() {
-    const duration = prompt('练嗓时长（分钟）？');
-    if (!duration) return;
-    
+// 睡眠
+function openSleepModal() {
+    openModal('sleep-modal');
+    AppState.setSleepStar(3);
+    const now = new Date();
+    const timeStr = now.toTimeString().slice(0, 5);
+    get('wake-time').value = '';
+    get('bed-time').value = '';
+}
+
+function setSleepStar(n) {
+    AppState.setSleepStar(n);
+}
+
+async function submitSleep() {
+    const wakeTime = get('wake-time').value;
+    const bedTime = get('bed-time').value;
+
+    if (!wakeTime && !bedTime) {
+        showToast('请至少填写一个时间');
+        return;
+    }
+
     try {
-        await API.addVoice({
-            duration: parseInt(duration),
-            type: '发声'
-        });
-        showToast('🎤 练嗓记录成功');
+        if (wakeTime) {
+            await API.post('/api/sleep/wake', { time: wakeTime });
+        }
+        if (bedTime) {
+            await API.post('/api/sleep/bed', {
+                time: bedTime,
+                sleepiness_level: 3
+            });
+        }
+
+        await API.recordSleep({ quality: AppState.currentSleepStar });
+
+        closeModal('sleep-modal');
+        showToast('😴 睡眠已记录');
         loadTodayData();
     } catch (error) {
-        showToast('记录失败: ' + error.message);
+        showToast('记录失败');
     }
 }
 
-// 自定义模块
-async function openCustomModal() {
-    const name = prompt('模块名称？');
-    if (!name) return;
-    const value = prompt('记录值？');
-    
-    try {
-        await API.addCustom({
-            module_name: truncate(name, 50),
-            value: truncate(value, CONFIG.MAX_TEXT_LENGTH)
-        });
-        showToast('✅ 自定义记录成功');
+// ============================================
+// Tab 切换
+// ============================================
+function switchTab(tab) {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    event.currentTarget.classList.add('active');
+
+    if (tab === 'today') {
         loadTodayData();
-    } catch (error) {
-        showToast('记录失败: ' + error.message);
+    } else if (tab === 'data') {
+        showToast('📊 数据看板开发中');
+    } else if (tab === 'settings') {
+        showToast('⚙️ 设置开发中');
     }
 }
 
-// 数据看板
-function loadDataDashboard() {
-    showToast('📊 数据看板加载中...');
-}
+// ============================================
+// 初始化
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // 设置日期
+    get('current-date').textContent = formatDate(new Date());
 
-function loadWeeklyStats() {
-    // 实现图表加载
-}
+    // 加载数据
+    loadTodayData();
+
+    // 设置默认时间
+    const now = new Date();
+    const timeStr = now.toTimeString().slice(0, 5);
+    const wakeInput = get('wake-time');
+    const bedInput = get('bed-time');
+    if (wakeInput) wakeInput.value = timeStr;
+    if (bedInput) bedInput.value = timeStr;
+});
+
+// 点击遮罩关闭模态框
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.classList.remove('active');
+        }
+    });
+});
